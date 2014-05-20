@@ -1,0 +1,16 @@
+name = Commerce Kickstart Order
+description = Provides Kickstart-specific cart and order customizations.
+core = 7.x
+package = Commerce Kickstart
+
+dependencies[] = views
+dependencies[] = commerce_message
+dependencies[] = commerce_cart
+dependencies[] = ctools
+
+; Information added by Drupal.org packaging script on 2014-04-22
+version = "7.x-2.14"
+core = "7.x"
+project = "commerce_kickstart"
+datestamp = "1398158656"
+
