@@ -1,0 +1,173 @@
+<?php
+
+/* 
+ * @file
+ * Provides an API for TrustPay Payment Gateway.
+ * 
+ */
+
+/**
+ * Implements hook_commerce_payment_method_info().
+ */
+function commerce_trustpay_commerce_payment_method_info() {
+  $payment_methods = array();
+
+  $payment_methods['commerce_trustpay'] = array(
+    'title' => t('TrustPay'),
+    'description' => t('Integrates with the TrustPay payment gateway.'),
+    'active' => TRUE,
+    'offsite' => TRUE,
+    'offsite_autoredirect' => TRUE,
+  );
+
+  return $payment_methods;
+}
+
+/**
+ * Payment method callback: settings form.
+ */
+function commerce_trustpay_settings_form($settings = NULL) {
+  $form = array();
+
+  $form['vendor_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('TrustPay Vendor ID'),
+    '#description' => t('The Vendor ID as given by the TrustPay system. Used to uniquely identify the receiving account.'),
+    '#default_value' => isset($settings['vendor_id']) ? $settings['vendor_id'] : '',
+    '#required' => TRUE,
+  );
+
+  $form['success_url'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Custom Success URL'),
+    '#description' => t('The Custom URL to which success payments should be directed.'),
+    '#default_value' => isset($settings['success_url']) ? $settings['success_url'] : '',
+    '#required' => FALSE,
+  );
+  
+  $form['cancel_url'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Custom Cancel URL'),
+    '#description' => t('The URL to which cancel payments should be directed.'),
+    '#default_value' => isset($settings['cancel_url']) ? $settings['cancel_url'] : '',
+    '#required' => FALSE,
+  );
+  
+  $form['istest'] = array(
+    '#type' => 'radios',
+    '#title' => t('Transaction Mode'),
+    '#options' => array(
+      'yes' => ('Testing Mode'),
+      'no' => ('Live Mode'),
+    ),
+    '#default_value' => isset($settings['istest']) ? $settings['istest'] : 'on',
+  );
+
+  return $form;
+}
+
+/**
+ * Payment function (callback): redirect form to facilate TrustPay Payment Gateway 
+ * redirect.
+ * 
+ * https://my.trustpay.biz/TrustPayWebClient/Transact?
+ * vendor_id=ap.a097b5e4-f985-4054-a2c8-75db128b7a6a
+ * &appuser=Test+Test
+ * &currency=ZAR
+ * &amount=3.00
+ * &txid=2336
+ * &fail=http%3A%2F%2Flocalhost%2Fwoocommerce%2F%3Fpage_id%3D7%26order-pay%3D2336%26pay_for_order%3Dtrue%26key%3Dwc_order_537350ed10f77
+ * &success=http%3A%2F%2Flocalhost%2Fwoocommerce%2F%3Fpage_id%3D7%26order-received%3D2336%26key%3Dwc_order_537350ed10f77
+ * &cancel=http%3A%2F%2Flocalhost%2Fwoocommerce%2F%3Fpage_id%3D6%26cancel_order%3Dtrue%26order%3Dwc_order_537350ed10f77%26order_id%3D2336%26redirect%26_wpnonce%3D288f739079
+ * &message=New+order+from+Demo+Online+Store-WooCommerce
+ * &istest=yes
+ *
+ * 
+ * https://my.trustpay.biz/TrustPayWebClient/Transact?
+ * vendor_id=ap.317cf227-c4e2-44c1-a333-bd431d62b371
+ * &appuser=Testw
+ * &currency=ZAR
+ * &amount=4500
+ * &txid=8
+ * &success=http%3A%2F%2Flocalhost%2Fdpkickstart%2F%3Fq%3Dcheckout%2F8%2Fpayment%2Freturn%2F_1vMJKKIRkmprED_Du3m4Rqr_5YYFpxCg3Mu9PM0G0k
+ * &fail=http%3A%2F%2Flocalhost%2Fdpkickstart%2F%3Fq%3Dcheckout%2F8%2Fpayment%2Fback%2F_1vMJKKIRkmprED_Du3m4Rqr_5YYFpxCg3Mu9PM0G0k
+ * &messsage=New+Order+8+at+Commerce+Kickstart
+ * &istest=on
+ * &form_build_id=form-yWVc7jAzhmGtAnKCsxp1IrNP51pZaJytRVW2NTc1J2c
+ * &form_token=7LyYGFhrg-HjjI137xp6tXqoPM8rUEQwWgnka1AalWc
+ * &form_id=commerce_checkout_form_payment
+ * 
+ * 
+ */
+function commerce_trustpay_redirect_form($form, &$form_state, $order, $payment_method) {
+   
+  $wrapper = entity_metadata_wrapper('commerce_order', $order);
+  
+  $currency_code = $wrapper->commerce_order_total->currency_code->value();
+  $amount = $wrapper->commerce_order_total->amount->value();
+  
+  //customer
+  $customer = array();
+  $commerce_customer = commerce_customer_profile_load($order->commerce_customer_billing['und'][0]['profile_id']);
+  
+  //account
+  $account = user_load($commerce_customer->uid);
+  $commerce_customer = $commerce_customer->commerce_customer_address['und'][0];
+
+  if (empty($commerce_customer['first_name'])) {
+    $customer['appuser'] = $commerce_customer['name_line'] . $commerce_customer['last_name'];
+  }
+  else {
+    $customer['appuser'] = $commerce_customer['first_name'] . $commerce_customer['last_name'];
+  }
+ 
+  //success_url 
+  if (empty($payment_method['settings']['success_url'])) {
+      $success_url = url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], array('absolute' => TRUE));
+  }
+  else {
+      $success_url = $payment_method['settings']['success_url'];
+  }
+  
+  //cancel_url
+  if (empty($payment_method['settings']['cancel_url'])) {
+      $cancel_url = url('checkout/' . $order->order_id . '/payment/back/' . $order->data['payment_redirect_key'], array('absolute' => TRUE));
+  }
+  else {
+      $cancel_url = $payment_method['settings']['cancel_url'];
+  }
+  
+  // @TODO: allow customization of the following through settings
+  // message, appuser & txid  
+  
+  // array to hold the trustpay api details.
+  $data = array(
+    'vendor_id' => $payment_method['settings']['vendor_id'],
+    'appuser'   => $customer['appuser'],
+    'currency'  => $currency_code,
+    'amount'    => $amount,
+    'txid'      => $order->order_id,
+    'success'   => $success_url,
+    'fail'      => $cancel_url,
+    'messsage'  => t('New Order @order_number at @store', array('@order_number' => $order->order_number, '@store' => variable_get('site_name', url('<front>', array('absolute' => TRUE))))),
+    'istest'    => $payment_method['settings']['istest']
+  );
+  $form['#action'] = 'https://my.trustpay.biz/TrustPayWebClient/Transact?';
+  $form['#method'] = 'GET';
+  $form['#attributes'] = array('name' => 'frmPay');
+
+  foreach ($data as $name => $value) {
+    if (!empty($value)) {
+      $form[$name] = array('#type' => 'hidden', '#value' => $value);
+    }
+  }
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Proceed to TrustPay'),
+  );
+
+  return $form;
+    
+}
+

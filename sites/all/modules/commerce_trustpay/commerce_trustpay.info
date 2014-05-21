@@ -1,0 +1,8 @@
+name = TrustPay
+description = Implements the TrustPay API with Drupal Commerce.
+core = 7.x
+package = Commerce (payment)
+dependencies[] = commerce
+dependencies[] = commerce_payment
+
+
