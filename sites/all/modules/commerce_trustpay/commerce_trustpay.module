@@ -69,35 +69,6 @@ function commerce_trustpay_settings_form($settings = NULL) {
 /**
  * Payment function (callback): redirect form to facilate TrustPay Payment Gateway 
  * redirect.
- * 
- * https://my.trustpay.biz/TrustPayWebClient/Transact?
- * vendor_id=ap.a097b5e4-f985-4054-a2c8-75db128b7a6a
- * &appuser=Test+Test
- * &currency=ZAR
- * &amount=3.00
- * &txid=2336
- * &fail=http%3A%2F%2Flocalhost%2Fwoocommerce%2F%3Fpage_id%3D7%26order-pay%3D2336%26pay_for_order%3Dtrue%26key%3Dwc_order_537350ed10f77
- * &success=http%3A%2F%2Flocalhost%2Fwoocommerce%2F%3Fpage_id%3D7%26order-received%3D2336%26key%3Dwc_order_537350ed10f77
- * &cancel=http%3A%2F%2Flocalhost%2Fwoocommerce%2F%3Fpage_id%3D6%26cancel_order%3Dtrue%26order%3Dwc_order_537350ed10f77%26order_id%3D2336%26redirect%26_wpnonce%3D288f739079
- * &message=New+order+from+Demo+Online+Store-WooCommerce
- * &istest=yes
- *
- * 
- * https://my.trustpay.biz/TrustPayWebClient/Transact?
- * vendor_id=ap.317cf227-c4e2-44c1-a333-bd431d62b371
- * &appuser=Testw
- * &currency=ZAR
- * &amount=4500
- * &txid=8
- * &success=http%3A%2F%2Flocalhost%2Fdpkickstart%2F%3Fq%3Dcheckout%2F8%2Fpayment%2Freturn%2F_1vMJKKIRkmprED_Du3m4Rqr_5YYFpxCg3Mu9PM0G0k
- * &fail=http%3A%2F%2Flocalhost%2Fdpkickstart%2F%3Fq%3Dcheckout%2F8%2Fpayment%2Fback%2F_1vMJKKIRkmprED_Du3m4Rqr_5YYFpxCg3Mu9PM0G0k
- * &messsage=New+Order+8+at+Commerce+Kickstart
- * &istest=on
- * &form_build_id=form-yWVc7jAzhmGtAnKCsxp1IrNP51pZaJytRVW2NTc1J2c
- * &form_token=7LyYGFhrg-HjjI137xp6tXqoPM8rUEQwWgnka1AalWc
- * &form_id=commerce_checkout_form_payment
- * 
- * 
  */
 function commerce_trustpay_redirect_form($form, &$form_state, $order, $payment_method) {
    
@@ -145,11 +116,11 @@ function commerce_trustpay_redirect_form($form, &$form_state, $order, $payment_m
     'vendor_id' => $payment_method['settings']['vendor_id'],
     'appuser'   => $customer['appuser'],
     'currency'  => $currency_code,
-    'amount'    => $amount,
+    'amount'    => round(commerce_currency_amount_to_decimal($amount, $currency_code), 2),
     'txid'      => $order->order_id,
     'success'   => $success_url,
     'fail'      => $cancel_url,
-    'messsage'  => t('New Order @order_number at @store', array('@order_number' => $order->order_number, '@store' => variable_get('site_name', url('<front>', array('absolute' => TRUE))))),
+    'message'  => t('New Order @order_number at @store', array('@order_number' => $order->order_number, '@store' => variable_get('site_name', url('<front>', array('absolute' => TRUE))))),
     'istest'    => $payment_method['settings']['istest']
   );
   $form['#action'] = 'https://my.trustpay.biz/TrustPayWebClient/Transact?';
