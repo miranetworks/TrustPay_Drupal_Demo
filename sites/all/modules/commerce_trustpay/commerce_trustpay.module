@@ -124,7 +124,7 @@ function commerce_trustpay_redirect_form($form, &$form_state, $order, $payment_m
     'istest'    => $payment_method['settings']['istest']
   );
   $form['#action'] = 'https://my.trustpay.biz/TrustPayWebClient/Transact?';
-  //$form['#method'] = 'GET';
+  $form['#method'] = 'GET';
   $form['#attributes'] = array('name' => 'frmPay');
 
   foreach ($data as $name => $value) {
