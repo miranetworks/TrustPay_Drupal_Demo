@@ -229,9 +229,6 @@ function commerce_trustpay_process_tpn($payment_method = NULL) {
     $url = substr($notificationurl,0,$pos);
     
     $consumer = new OAuthConsumer($tpn['oauth_consumer_key'], $shared_secret, $notificationurl); 
-
-    /*echo '<pre>'.var_dump($params).'</pre>'; */
-       
     $request = new OAuthRequest("GET", $notificationurl, $params);
     $oauth_signature = $request->build_signature(new OAuthSignatureMethod_HMAC_SHA1, $consumer, NULL);
        
@@ -251,34 +248,40 @@ function commerce_trustpay_process_tpn($payment_method = NULL) {
           watchdog('commerce_trustpay', 'TPN invalid: The specified vendor_id is not valid (@vendor_id).', array('@vendor_id' => $tpn['application_id']), WATCHDOG_ERROR);
           return FALSE;
         } 
-        
+        // Create a new payment transaction for the order.
+        $transaction = commerce_payment_transaction_new('trustpay', $order->order_id);
+        $transaction->instance_id = $payment_method['instance_id'];
+        $transaction->remote_id = $tpn['tp_transaction_id'];
+        $transaction->amount = commerce_currency_decimal_to_amount($tpn['amount'], $tpn['currency']);
+        $transaction->currency_code = $tpn['currency'];
+        $transaction->payload[REQUEST_TIME] = $tpn;
+        $transaction->remote_status = $tpn['status'];
+
+        //Only SUCCESS & FAILURE status from TPN expected
         if ($tpn['status'] == 'SUCCESS') {
-          // Create a new payment transaction for the order.
-          $transaction = commerce_payment_transaction_new('trustpay', $order->order_id);
-          $transaction->instance_id = $payment_method['instance_id'];
-          $transaction->remote_id = $tpn['tp_transaction_id'];
-          $transaction->amount = commerce_currency_decimal_to_amount($tpn['amount'], $tpn['currency']);
-          $transaction->currency_code = $tpn['currency'];
-          $transaction->payload[REQUEST_TIME] = $tpn;
-          $transaction->remote_status = $tpn['status'];
           $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
           $transaction->message = t('The payment has completed.');
-
-          commerce_payment_transaction_save($transaction);
-          commerce_payment_redirect_pane_next_page($order);
-          
-          watchdog('commerce_trustpay', 'TPN processed for Order @order_number with ID @txn_id.', array('@txn_id' => $tpn['tp_transaction_id'], '@order_number' => $order->order_number), WATCHDOG_INFO);
-
-          // Necessary to trigger order completion
-          $order = commerce_order_status_update($order, 'checkout_complete');  
-          commerce_checkout_complete($order);
-
-          $tpn['transaction_id'] = $transaction->transaction_id;
-          $tpn['order_id'] = $order->order_id;
-          $tpn['vendor_id'] = $tpn['application_id'];
-          commerce_trustpay_tpn_save($tpn);
+        }else{
+          $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE; 
+          $transaction->message = t('The payment has failed.');
         }
-        
+        commerce_payment_transaction_save($transaction);
+        commerce_payment_redirect_pane_next_page($order);
+
+        watchdog('commerce_trustpay', 'TPN processed for Order @order_number with ID @txn_id.', array('@txn_id' => $tpn['tp_transaction_id'], '@order_number' => $order->order_number), WATCHDOG_INFO);
+
+        // Necessary to trigger order completion
+        if ($tpn['status'] == 'SUCCESS') {
+            $order = commerce_order_status_update($order, 'checkout_complete');  
+        }else{
+            $order = commerce_order_status_update($order, 'canceled');  
+        }
+        commerce_checkout_complete($order);
+
+        $tpn['transaction_id'] = $transaction->transaction_id;
+        $tpn['order_id'] = $order->order_id;
+        $tpn['vendor_id'] = $tpn['application_id'];
+        commerce_trustpay_tpn_save($tpn);
     }else{
         watchdog('commerce_trustpay', 'Attempt to validate TPN failed through oauth verification.', array(), WATCHDOG_ALERT);
         return FALSE;
@@ -295,9 +298,7 @@ function commerce_trustpay_process_tpn($payment_method = NULL) {
  * @param $id
  *   The ID of the TPN to load.
  * @param $type
- *   The type of ID you've specified, either the serial numeric tpn_id or the
- *     actual PayFast pf_payment_id. Defaults to pf_payment_id.
- *
+ *   Defaults to tp_transaction_id.
  * @return
  *   The original TPN 
  */
@@ -310,16 +311,10 @@ function commerce_trustpay_tpn_load($id, $type = 'tp_transaction_id') {
 }
 
 /**
- * Saves an TPN with some meta data related to local processing.
- *
+ * Saves an TPN to the db
  * @param $tpn
  *   An TPN array with additional parameters for the order_id and Commerce
- *     Payment transaction_id associated with the TPN.
- *
- * @return
- *   The operation performed by drupal_write_record() on save; since the TPN is
- *     received by reference, it will also contain the serial numeric tpn_id
- *     used locally.
+ *     Payment transaction_id associated with the TPN. 
  */
 function commerce_trustpay_tpn_save(&$tpn) {
   if (!empty($tpn['tpn_id']) && commerce_trustpay_tpn_load($tpn['tp_transaction_id'])) {

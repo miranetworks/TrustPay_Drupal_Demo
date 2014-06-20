@@ -9,7 +9,7 @@
  * Implements hook_schema().
  */
 function commerce_trustpay_schema() {
-  $schema = array();
+    $schema = array();
 
     $schema['commerce_trustpay_tpn'] = array(
     'description' => 'Stores processed TPNs.',
@@ -88,12 +88,12 @@ function commerce_trustpay_schema() {
       'transaction_id' => array(
         'table' => 'commerce_payment_transaction',
         'columns' => array(
-          'payment_id' => 'payment_id',
+          'transaction_id' => 'transaction_id',
         ),
       ),
     ),
     'indexes' => array(
-      'tp_payment_id' => array('tp_payment_id'),
+      'tp_transaction_id' => array('tp_transaction_id'),
     ),
   );
   return $schema;
