@@ -20,8 +20,8 @@ function commerce_trustpay_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
       ),
-      'tp_payment_id' => array(
-        'description' => 'The TrustPay payment ID.',
+      'tp_transaction_id' => array(
+        'description' => 'The TrustPay transaction ID.',
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
@@ -48,7 +48,7 @@ function commerce_trustpay_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
-      'txt_gross_amount' => array(
+      'amount' => array(
         'description' => 'The transaction gross amount.',
         'type' => 'numeric',
         'size' => 'normal',
@@ -57,15 +57,8 @@ function commerce_trustpay_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
-      'payment_status' => array(
+      'status' => array(
         'description' => 'The status of the payment at TrustPay.',
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'server' => array(
-        'description' => 'The server used to process the payment.',
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
